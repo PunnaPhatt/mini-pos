@@ -139,7 +139,6 @@ export default function ProductsPage() {
 
       {errorMsg && <p className="text-danger">{errorMsg}</p>}
 
-      {/* ฟอร์มเพิ่มสินค้าใหม่ */}
       <div className="card">
         <h2>เพิ่มสินค้าใหม่</h2>
         <form onSubmit={handleAddProduct}>
@@ -195,7 +194,6 @@ export default function ProductsPage() {
         </form>
       </div>
 
-      {/* ตารางแสดงสินค้า */}
       {loading ? (
         <p>กำลังโหลดข้อมูล...</p>
       ) : (
@@ -206,3 +204,84 @@ export default function ProductsPage() {
               <th>ชื่อสินค้า</th>
               <th>ราคา</th>
               <th>คงเหลือ</th>
+              <th>หน่วย</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id}>
+                {editingId === product.id ? (
+                  <>
+                    <td>
+                      <input
+                        type="text"
+                        name="sku"
+                        value={editForm.sku}
+                        onChange={handleEditChange}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        name="name"
+                        value={editForm.name}
+                        onChange={handleEditChange}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        step="0.01"
+                        name="price"
+                        value={editForm.price}
+                        onChange={handleEditChange}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        name="stock"
+                        value={editForm.stock}
+                        onChange={handleEditChange}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="text"
+                        name="unit"
+                        value={editForm.unit}
+                        onChange={handleEditChange}
+                      />
+                    </td>
+                    <td>
+                      <button onClick={() => saveEdit(product.id)}>บันทึก</button>{' '}
+                      <button onClick={cancelEdit}>ยกเลิก</button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td>{product.sku}</td>
+                    <td>{product.name}</td>
+                    <td>{product.price}</td>
+                    <td>{product.stock}</td>
+                    <td>{product.unit}</td>
+                    <td>
+                      <button onClick={() => startEdit(product)}>แก้ไข</button>{' '}
+                      <button onClick={() => handleDelete(product.id)}>ลบ</button>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+            {products.length === 0 && (
+              <tr>
+                <td colSpan="6">ยังไม่มีสินค้า</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
