@@ -82,6 +82,7 @@ export default function ProductsPage() {
     if (!confirmDelete) return;
 
     const { error } = await supabase.from('products').delete().eq('id', id);
+
     if (error) {
       setErrorMsg(error.message);
     } else {
@@ -255,7 +256,9 @@ export default function ProductsPage() {
                       />
                     </td>
                     <td>
-                      <button onClick={() => saveEdit(product.id)}>บันทึก</button>{' '}
+                      <button onClick={() => saveEdit(product.id)}>
+                        บันทึก
+                      </button>{' '}
                       <button onClick={cancelEdit}>ยกเลิก</button>
                     </td>
                   </>
@@ -268,7 +271,9 @@ export default function ProductsPage() {
                     <td>{product.unit}</td>
                     <td>
                       <button onClick={() => startEdit(product)}>แก้ไข</button>{' '}
-                      <button onClick={() => handleDelete(product.id)}>ลบ</button>
+                      <button onClick={() => handleDelete(product.id)}>
+                        ลบ
+                      </button>
                     </td>
                   </>
                 )}
