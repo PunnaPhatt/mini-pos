@@ -18,7 +18,6 @@ export default function SellPage() {
   useEffect(() => {
     fetchProducts();
   }, []);
-
   async function fetchProducts() {
     setLoading(true);
     const { data, error } = await supabase
