@@ -48,17 +48,22 @@ export default function SellPage() {
     setErrorMsg('');
   }
 
-  // ส่งแจ้งเตือนไป Telegram ผ่าน API route ของเราเอง
-  // ทำงานแบบ try/catch แยกจาก flow หลัก ถ้าพลาดก็แค่ log ไว้ ไม่กระทบระบบขาย
-  async function sendTelegramNotification(payload) {
+  // ==== เพิ่มใหม่: ฟังก์ชันส่งข้อความแจ้งเตือนเข้า Telegram ผ่าน API Route ====
+  // ทำงานแบบ async/try-catch แยกออกจาก flow หลัก
+  // ถ้ายิงไม่สำเร็จ จะแค่ log error ไว้ ไม่กระทบการแจ้งผลขายสำเร็จบนหน้าเว็บ
+  async function sendTelegramNotification(message) {
     try {
-      await fetch('/api/notify-telegram', {
+      const res = await fetch('/api/notify-telegram', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ message }),
       });
+      const data = await res.json();
+      if (!data.ok) {
+        console.error('ส่งแจ้งเตือน Telegram ไม่สำเร็จ:', data.error);
+      }
     } catch (err) {
-      console.error('ส่งแจ้งเตือน Telegram ไม่สำเร็จ:', err);
+      console.error('ส่งแจ้งเตือน Telegram ผิดพลาด:', err.message);
     }
   }
 
@@ -114,7 +119,7 @@ export default function SellPage() {
       return;
     }
 
-    // ตัดสต๊อกสำเร็จ: แจ้งผลในเว็บทันที ไม่ต้องรอ Telegram
+    // สำเร็จ: แจ้งเตือนบนเว็บและรีเซ็ตฟอร์ม
     setSuccessMsg(
       `ขาย ${selectedProduct.name} จำนวน ${qtyNumber} ${selectedProduct.unit} สำเร็จ`
     );
@@ -122,27 +127,32 @@ export default function SellPage() {
     setSubmitting(false);
     fetchProducts();
 
-    // 3. ยิงแจ้งเตือน Telegram งานที่ 1: มีรายการขายใหม่
-    // ไม่ await ให้บล็อก UI และห่อด้วย try/catch อยู่ในฟังก์ชันแล้ว
-    sendTelegramNotification({
-      type: 'new_order',
-      data: {
-        productName: selectedProduct.name,
-        quantity: qtyNumber,
-        totalPrice: totalPrice,
-        stockAfter: newStock,
-      },
+    // ==== เพิ่มใหม่: ส่งแจ้งเตือนเข้า Telegram (ไม่ await แบบ blocking การขาย) ====
+    const soldTime = new Date().toLocaleString('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
     });
 
-    // 4. งานที่ 2: ถ้าสต๊อกเหลือน้อยกว่าหรือเท่ากับเกณฑ์ ยิงแจ้งเตือนแยกอีกข้อความ
+    // งานที่ 1: แจ้งเตือน Order เข้าใหม่
+    const orderMessage =
+      `🛍️ <b>มีรายการขายใหม่!</b>\n` +
+      `- สินค้า: ${selectedProduct.name}\n` +
+      `- จำนวน: ${qtyNumber} ชิ้น\n` +
+      `- ราคารวม: ${totalPrice.toFixed(2)} บาท\n` +
+      `- สต๊อกคงเหลือปัจจุบัน: ${newStock} ชิ้น\n` +
+      `- เวลา: ${soldTime}`;
+
+    sendTelegramNotification(orderMessage);
+
+    // งานที่ 2: แจ้งเตือนสต๊อกใกล้หมด (ยิงแยกอีก 1 ข้อความ ถ้าเข้าเงื่อนไข)
     if (newStock <= LOW_STOCK_THRESHOLD) {
-      sendTelegramNotification({
-        type: 'low_stock',
-        data: {
-          productName: selectedProduct.name,
-          stockAfter: newStock,
-        },
-      });
+      const lowStockMessage =
+        `🚨 <b>[เตือนภัย] สต๊อกสินค้าใกล้หมด!</b>\n` +
+        `- สินค้า: ${selectedProduct.name}\n` +
+        `- คงเหลือเพียง: ${newStock} ชิ้น\n` +
+        `⚠️ กรุณาเติมสต๊อกสินค้าด่วน!`;
+
+      sendTelegramNotification(lowStockMessage);
     }
   }
 
