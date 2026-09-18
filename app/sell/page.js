@@ -3,8 +3,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 
-// เกณฑ์แจ้งเตือนสต๊อกใกล้หมด
-const LOW_STOCK_THRESHOLD = 5;
+// ส่งข้อความแจ้งเตือนไปยัง Telegram ผ่าน API Route ของเราเอง
+// ทำงานแบบ try/catch เสมอ เพื่อไม่ให้ error จาก Telegram กระทบระบบขาย
+async function sendTelegramNotification(text) {
+  try {
+    await fetch('/api/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  } catch (err) {
+    // เงียบไว้ ไม่ต้อง throw ต่อ เพื่อไม่ให้กระทบ flow การขาย
+    console.error('Telegram notify failed:', err);
+  }
+}
 
 export default function SellPage() {
   const [products, setProducts] = useState([]);
@@ -39,6 +51,7 @@ export default function SellPage() {
   }
 
   const selectedProduct = products.find((p) => p.id === selectedId);
+
   const qtyNumber = parseInt(quantity, 10) || 0;
   const totalPrice = selectedProduct ? selectedProduct.price * qtyNumber : 0;
 
@@ -46,25 +59,6 @@ export default function SellPage() {
     setQuantity('');
     setSuccessMsg('');
     setErrorMsg('');
-  }
-
-  // ==== เพิ่มใหม่: ฟังก์ชันส่งข้อความแจ้งเตือนเข้า Telegram ผ่าน API Route ====
-  // ทำงานแบบ async/try-catch แยกออกจาก flow หลัก
-  // ถ้ายิงไม่สำเร็จ จะแค่ log error ไว้ ไม่กระทบการแจ้งผลขายสำเร็จบนหน้าเว็บ
-  async function sendTelegramNotification(message) {
-    try {
-      const res = await fetch('/api/notify-telegram', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        console.error('ส่งแจ้งเตือน Telegram ไม่สำเร็จ:', data.error);
-      }
-    } catch (err) {
-      console.error('ส่งแจ้งเตือน Telegram ผิดพลาด:', err.message);
-    }
   }
 
   async function handleSell(e) {
@@ -119,21 +113,12 @@ export default function SellPage() {
       return;
     }
 
-    // สำเร็จ: แจ้งเตือนบนเว็บและรีเซ็ตฟอร์ม
-    setSuccessMsg(
-      `ขาย ${selectedProduct.name} จำนวน ${qtyNumber} ${selectedProduct.unit} สำเร็จ`
-    );
-    setQuantity('');
-    setSubmitting(false);
-    fetchProducts();
-
-    // ==== เพิ่มใหม่: ส่งแจ้งเตือนเข้า Telegram (ไม่ await แบบ blocking การขาย) ====
+    // 3. ตัดสต๊อกสำเร็จแล้ว -> ยิงแจ้งเตือน Telegram (ไม่บล็อกผลลัพธ์การขาย)
     const soldTime = new Date().toLocaleString('th-TH', {
       dateStyle: 'medium',
       timeStyle: 'short',
     });
 
-    // งานที่ 1: แจ้งเตือน Order เข้าใหม่
     const orderMessage =
       `🛍️ <b>มีรายการขายใหม่!</b>\n` +
       `- สินค้า: ${selectedProduct.name}\n` +
@@ -142,10 +127,11 @@ export default function SellPage() {
       `- สต๊อกคงเหลือปัจจุบัน: ${newStock} ชิ้น\n` +
       `- เวลา: ${soldTime}`;
 
+    // งานที่ 1: แจ้งเตือน Order เข้า
     sendTelegramNotification(orderMessage);
 
-    // งานที่ 2: แจ้งเตือนสต๊อกใกล้หมด (ยิงแยกอีก 1 ข้อความ ถ้าเข้าเงื่อนไข)
-    if (newStock <= LOW_STOCK_THRESHOLD) {
+    // งานที่ 2: แจ้งเตือน Stock เหลือน้อย (<= 5 ชิ้น)
+    if (newStock <= 5) {
       const lowStockMessage =
         `🚨 <b>[เตือนภัย] สต๊อกสินค้าใกล้หมด!</b>\n` +
         `- สินค้า: ${selectedProduct.name}\n` +
@@ -154,6 +140,14 @@ export default function SellPage() {
 
       sendTelegramNotification(lowStockMessage);
     }
+
+    // สำเร็จ: แจ้งเตือนในเว็บและรีเซ็ตฟอร์ม (ทำงานปกติแม้ Telegram จะมีปัญหา)
+    setSuccessMsg(
+      `ขาย ${selectedProduct.name} จำนวน ${qtyNumber} ${selectedProduct.unit} สำเร็จ`
+    );
+    setQuantity('');
+    setSubmitting(false);
+    fetchProducts();
   }
 
   return (
@@ -220,3 +214,4 @@ export default function SellPage() {
     </div>
   );
 }
+
